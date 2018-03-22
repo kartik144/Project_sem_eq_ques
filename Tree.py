@@ -9,6 +9,7 @@ class TreeNode:
 		self.data=name
 		self.X=None
 		self.H=None
+		self.U=None#############CHANGE
 		self.R=None
 		self.type=None
 		self.parent=None

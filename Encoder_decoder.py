@@ -112,8 +112,8 @@ class TreeRNN(nn.Module):
 			return
 	def reconstruct(self,node,embedding_dim=50):
 		if (node.parent != None):
-			u=F.tanh(self.D[node.type](node.parent.H))
-			node.R=F.tanh(self.Dv(u))
+			node.U=F.tanh(self.D[node.type](node.parent.U))########CHANGE
+			node.R=F.tanh(self.Dv(node.U))########CHANGE
 		if (node.children == []):
 			return
 		else:
@@ -125,7 +125,7 @@ class TreeRNN(nn.Module):
 			return (((node.R - node.X)*(node.R - node.X))/embedding_dim)
 		else:
 			acc=Variable(torch.zeros(1,embedding_dim))
-			for c in node.children:
+			for c in node.children:	
 				acc=acc+self.getError(c,embedding_dim)
 			if (node.parent != None):
 				return ((((node.R - node.X)*(node.R - node.X))/embedding_dim)+acc)
@@ -138,6 +138,7 @@ class TreeRNN(nn.Module):
 		
 	def forward(self,node,embedding_dim):
 		self.synthesis(node,embedding_dim)
+		node.U=node.H########CHANGE
 		self.reconstruct(node,embedding_dim)
 
 def generate_dataset(input_file="Input Files/NTU_ques_dependencies_parsed.txt"):
@@ -186,7 +187,7 @@ def generate_dataset(input_file="Input Files/NTU_ques_dependencies_parsed.txt"):
 	print("Dataset generated in {0:0.4f} seconds...".format(time()-t0))
 	return dataset
 	
-def train_model(train_set,word_vec_file="GloVe/glove.6B/glove.6B.50d.txt",embedding_dim=50,lr=0.001):
+def train_model(total_epochs,train_set,word_vec_file="GloVe/glove.6B/glove.6B.50d.txt",embedding_dim=50,lr=0.001):
 	
 	model=TreeRNN(labels,embedding_dim)
 	
@@ -196,11 +197,12 @@ def train_model(train_set,word_vec_file="GloVe/glove.6B/glove.6B.50d.txt",embedd
 	losses=[]
 	epochs=[]
 	total_time=time()
-	for epoch in range(1000):
+	for epoch in range(total_epochs):
+		
 		t0=time()
 		total_loss = torch.Tensor([0])
 		for root in train_set:
-		
+			#t00=time()
 			model.zero_grad()
 			model(root,embedding_dim)
 		
@@ -209,8 +211,9 @@ def train_model(train_set,word_vec_file="GloVe/glove.6B/glove.6B.50d.txt",embedd
 		
 			loss.backward()
 			optimizer.step()
-		print("Epoch number {0}: \nTime : {1:0.4f}\nError: ".format(epoch,(time()-t0)),end="")
-		print(total_loss[0])
+			#print(time()-t00)
+			#k=input()	
+		print("Epoch number {0}: \nTime : {1:0.4f}\nError: {2:0.4f}\nAverage Error per sentence: {3:0.4f}".format(epoch,(time()-t0),total_loss[0],total_loss[0]/len(train_set)),end="\n\n")	
 		losses.append(total_loss[0])
 		epochs.append(epoch)
 		
@@ -224,24 +227,26 @@ def train_model(train_set,word_vec_file="GloVe/glove.6B/glove.6B.50d.txt",embedd
 	plt.legend(loc='upper right')
 	plt.show()
 	print("Time taken to train: {0:0.4f}".format(time()-total_time))
-	print(epochs)
-	print(losses)
-	print(embed(Variable(torch.LongTensor([words2idx['the']]))))
+	#print(epochs)
+	#print(losses)
+	#print(embed(Variable(torch.LongTensor([words2idx['the']]))))
 	
 word_vec_file="GloVe/glove.6B/glove.6B.100d.txt"
 embedding_dim=100
 embed,words2idx=getEmbeddings(word_vec_file,embedding_dim)
-print(embed(Variable(torch.LongTensor([words2idx['the']]))))
+#print(embed(Variable(torch.LongTensor([words2idx['the']]))))
 labels=['compound', 'advmod', 'cc_preconj', '\n', 'mark', 'acl', 'auxpass', 'ccomp', 'conj', 'cc', 'parataxis', 'punct', 'nmod_poss', 'det_predet', 'nsubjpass', 'case', 'nsubj', 'expl', 'iobj', 'det', 'csubjpass', 'neg', 'discourse', 'amod', 'mwe', 'xcomp', 'nummod', 'compound_prt', 'cop', 'dep', 'nmod_tmod', 'root', 'nmod_npmod', 'dobj', 'appos', 'nmod', 'aux', 'csubj', 'acl_relcl', 'advcl']
 
 dataset=generate_dataset()
-train_set=dataset[0:1584]
+train_set=dataset[0:100]
 missing_words=[]
 lr=0.001
-epochs=1000
-#train_model(train_set,word_vec_file,embedding_dim,lr)
+epochs=100000
+train_model(epochs,train_set,word_vec_file,embedding_dim,lr)
 model=torch.load("Saved Models/Saved_model_"+str(lr)+"_"+str(epochs+1)+".pt")
-train_set[0].print_tree()
+#train_set[0].print_tree()
 model(train_set[0],embedding_dim)
 train_set[0].print_tree()
+print(model.TreeRNN_MSE(train_set[0],embedding_dim))
 print(len(set(missing_words)))
+print(set(missing_words))
